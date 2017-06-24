@@ -28,7 +28,7 @@ class CodegenImplObject {
         ctx.append(String.format("public static void encode_(%s obj, com.jsoniter.output.JsonStream stream) throws java.io.IOException {", classInfo.clazz.getCanonicalName()));
         if (hasFieldOutput(desc)) {
             int notFirst = 0;
-            ctx.buffer('{');
+            ctx.append("stream.writeObjectStart();");
             for (String toName : toNames) {
                 notFirst = genField(ctx, bindings.get(toName), toName, notFirst);
             }
@@ -49,7 +49,7 @@ class CodegenImplObject {
                     ctx.append(String.format("obj.%s(stream);", unwrapper.method.getName()));
                 }
             }
-            ctx.buffer('}');
+            ctx.append("stream.writeObjectEnd();");
         } else {
             ctx.buffer("{}");
         }
@@ -99,14 +99,11 @@ class CodegenImplObject {
                 }
                 ctx.append(String.format("if (%s != null) {", valueAccessor));
                 notFirst = appendComma(ctx, notFirst);
-                ctx.append(CodegenResult.bufferToWriteOp("\"" + toName + "\":"));
+                ctx.append(String.format("stream.writeRaw(\"%s\");", "\\\"" + toName + "\\\":"));
             } else {
                 notFirst = appendComma(ctx, notFirst);
-                ctx.buffer('"');
-                ctx.buffer(toName);
-                ctx.buffer('"');
-                ctx.buffer(':');
                 ctx.append(String.format("if (%s == null) { stream.writeNull(); } else {", valueAccessor));
+                ctx.append(String.format("stream.writeRaw(\"%s\");", "\\\"" + toName + "\\\":"));
             }
         } else {
             if (encoder == null && valueClazz.isPrimitive() && !(valueClazz == String.class) && omitZero) {
@@ -117,13 +114,10 @@ class CodegenImplObject {
                 String t = CodegenImplNative.getTypeName(binding.valueType);
                 ctx.append(String.format("if (!(((%s)%s) == 0)) {", t, valueAccessor));
                 appendComma(ctx, notFirst);
-                ctx.append(CodegenResult.bufferToWriteOp("\"" + toName + "\":"));
+                ctx.append(String.format("stream.writeRaw(\"%s\");", "\\\"" + toName + "\\\":"));
             } else {
                 notFirst = appendComma(ctx, notFirst);
-                ctx.buffer('"');
-                ctx.buffer(toName);
-                ctx.buffer('"');
-                ctx.buffer(':');
+                ctx.append(String.format("stream.writeRaw(\"%s\");", "\\\"" + toName + "\\\":"));
             }
         }
         if (encoder == null) {
@@ -140,9 +134,9 @@ class CodegenImplObject {
 
     private static int appendComma(CodegenResult ctx, int notFirst) {
         if (notFirst == 1) { // definitely not first
-            ctx.buffer(',');
+            ctx.append("stream.writeMore();");
         } else if (notFirst == 2) { // maybe not first, previous field is omitNull
-            ctx.append("if (notFirst) { stream.write(','); } else { notFirst = true; }");
+            ctx.append("if (notFirst) { stream.writeMore(); } else { notFirst = true; }");
         } else { // this is the first, do not write comma
             notFirst = 1;
         }
